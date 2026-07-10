@@ -1,0 +1,50 @@
+services:
+  seerr-issues:
+    build: .
+    # Or use a prebuilt image once you publish one:
+    # image: ghcr.io/youruser/seerr-issues:latest
+    container_name: seerr-issues
+    restart: unless-stopped
+    ports:
+      - "3939:3939"
+    volumes:
+      # Persists pending redownloads so the auto-resolve loop survives restarts.
+      - ./data:/data
+    environment:
+      # --- General ---
+      PORT: "3939"
+      LOG_LEVEL: "info"
+      # Shared secret Seerr must present (Authorization: Bearer <secret>,
+      # X-Webhook-Secret header, or ?token=<secret>). Leave unset to disable.
+      WEBHOOK_SECRET: "change-me"
+      # blocklist-search | search | delete-search
+      REDOWNLOAD_MODE: "blocklist-search"
+      # Comma-separated Seerr issue type ids to act on (1=video 2=audio
+      # 3=subtitles 4=other). Empty = act on all.
+      ISSUE_TYPES: ""
+
+      # --- Radarr (movies) ---
+      RADARR_URL: "http://radarr:7878"
+      RADARR_API_KEY: "your-radarr-api-key"
+
+      # --- Sonarr (tv) ---
+      SONARR_URL: "http://sonarr:8989"
+      SONARR_API_KEY: "your-sonarr-api-key"
+
+      # --- Seerr (optional: auto-resolve issues once replacement imports) ---
+      # Leave unset to keep fire-and-forget behavior (no issue resolution).
+      SEERR_URL: "http://seerr:5055"
+      SEERR_API_KEY: "your-seerr-api-key"
+      # Post a comment on the issue when resolving it (true/false).
+      RESOLVE_COMMENT: "true"
+      # Give up waiting for a replacement import after this many days.
+      PENDING_TTL_DAYS: "7"
+      # Where pending redownloads are stored (mounted volume below).
+      STATE_FILE: "/data/pending.json"
+    # If Radarr/Sonarr/Seerr run in the same compose project, join their network
+    # so the service names above resolve.
+    # networks:
+    #   - media
+# networks:
+#   media:
+#     external: true
