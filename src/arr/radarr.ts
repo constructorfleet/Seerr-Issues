@@ -16,7 +16,6 @@ interface QueueRecord {
 }
 
 interface HistoryRecord {
-  id: number;
   eventType: string;
   date?: string;
 }
@@ -73,26 +72,6 @@ export class RadarrClient extends ArrClient {
     return records.length;
   }
 
-  /**
-   * Blocklist the release that produced the currently-imported file by marking
-   * its most recent "grabbed" history event as failed. This stops the indexer
-   * from handing back the same bad release on the next search.
-   */
-  private async blocklistImported(movieId: number): Promise<boolean> {
-    // Radarr's /history/movie returns a bare array (unlike the paged /history
-    // endpoint, which wraps records in an object). Records are newest-first.
-    const records = await this.request<HistoryRecord[]>("GET", "/history/movie", {
-      query: { movieId },
-    });
-    // Pick the most recent grab by date rather than trusting array order.
-    const grabbed = (records ?? [])
-      .filter((r) => r.eventType === "grabbed")
-      .sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""))[0];
-    if (!grabbed) return false;
-    await this.request("POST", `/history/failed/${grabbed.id}`);
-    return true;
-  }
-
   async redownload(
     tmdbId: number,
     mode: RedownloadMode,
@@ -114,14 +93,12 @@ export class RadarrClient extends ArrClient {
     const removed = await this.removeFromQueue(movie.id, mode !== "search");
     if (removed > 0) actions.push(`removed ${removed} queue item(s)`);
 
-    if (mode === "delete-search" && movie.hasFile && movie.movieFile) {
-      // Remove the imported file so the search has a gap to fill.
+    if (mode !== "search" && movie.hasFile && movie.movieFile) {
+      // A search does not reliably replace an existing file. Never mark the
+      // old import as failed merely to blocklist it: that corrupts Radarr's
+      // history while still leaving no missing-file gap for the search.
       await this.request("DELETE", `/moviefile/${movie.movieFile.id}`);
       actions.push("deleted existing file");
-    } else if (mode === "blocklist-search" && movie.hasFile) {
-      // Keep the file in place but blocklist its release so the search upgrades it.
-      const blocklisted = await this.blocklistImported(movie.id);
-      if (blocklisted) actions.push("blocklisted imported release");
     }
 
     await this.triggerSearch(movie.id);

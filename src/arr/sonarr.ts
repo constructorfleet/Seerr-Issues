@@ -23,11 +23,6 @@ interface QueueRecord {
   episodeId?: number;
 }
 
-interface HistoryRecord {
-  id: number;
-  eventType: string;
-}
-
 export interface SonarrResult {
   matched: boolean;
   title?: string;
@@ -96,17 +91,6 @@ export class SonarrClient extends ArrClient {
     return records.length;
   }
 
-  /** Blocklist the release that produced an episode's current file. */
-  private async blocklistImported(episodeId: number): Promise<boolean> {
-    const history = await this.request<{ records: HistoryRecord[] }>("GET", "/history", {
-      query: { episodeId, pageSize: 50, sortKey: "date", sortDirection: "descending" },
-    });
-    const grabbed = (history.records ?? []).find((r) => r.eventType === "grabbed");
-    if (!grabbed) return false;
-    await this.request("POST", `/history/failed/${grabbed.id}`);
-    return true;
-  }
-
   /**
    * Redownload for TV. Scope is driven by the Seerr issue's affected fields:
    *   - episode named  -> that single episode (EpisodeSearch)
@@ -167,18 +151,12 @@ export class SonarrClient extends ArrClient {
     const removed = await this.removeFromQueue(targetIds, mode !== "search");
     if (removed > 0) actions.push(`removed ${removed} queue item(s)`);
 
-    if (mode === "delete-search") {
+    if (mode !== "search") {
       const fileIds = [...new Set(targets.filter((e) => e.hasFile).map((e) => e.episodeFileId))];
       for (const fileId of fileIds) {
         await this.request("DELETE", `/episodefile/${fileId}`);
       }
       if (fileIds.length) actions.push(`deleted ${fileIds.length} file(s)`);
-    } else if (mode === "blocklist-search") {
-      let count = 0;
-      for (const ep of targets) {
-        if (ep.hasFile && (await this.blocklistImported(ep.id))) count++;
-      }
-      if (count) actions.push(`blocklisted ${count} release(s)`);
     }
 
     // Prefer Sonarr's native SeasonSearch for a whole season: it's a single
