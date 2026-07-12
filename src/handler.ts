@@ -117,7 +117,8 @@ export class IssueHandler {
     let scope = "";
     if (issue.mediaType === "tv") {
       const season = issue.affectedSeason && issue.affectedSeason > 0 ? issue.affectedSeason : null;
-      const episode = issue.affectedEpisode && issue.affectedEpisode > 0 ? issue.affectedEpisode : null;
+      const episode =
+        issue.affectedEpisode && issue.affectedEpisode > 0 ? issue.affectedEpisode : null;
       if (season !== null && episode !== null) {
         scope = ` (S${season}E${episode})`;
       } else if (season !== null) {
@@ -360,7 +361,10 @@ export class IssueHandler {
       }
     }
     this.store.confirmSearch(item.key);
-    log.info("Recovery: re-fired search a crash left un-sent", { key: item.key, title: item.title });
+    log.info("Recovery: re-fired search a crash left un-sent", {
+      key: item.key,
+      title: item.title,
+    });
   }
 
   /** Expire stale pending entries. */

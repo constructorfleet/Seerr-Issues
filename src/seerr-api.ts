@@ -19,15 +19,24 @@ export class SeerrApi {
   }
 
   private async request<T>(method: "GET" | "POST", path: string, body?: unknown): Promise<T> {
-    const res = await fetch(`${this.baseUrl}${path}`, {
-      method,
-      headers: {
-        "X-Api-Key": this.apiKey,
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
-      body: body !== undefined ? JSON.stringify(body) : undefined,
-    });
+    let res: Response;
+    try {
+      res = await fetch(`${this.baseUrl}${path}`, {
+        method,
+        headers: {
+          "X-Api-Key": this.apiKey,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: body !== undefined ? JSON.stringify(body) : undefined,
+      });
+    } catch (err) {
+      const cause = err instanceof Error ? err.cause : undefined;
+      throw new Error(
+        `Seerr ${method} ${path} request failed: ${String(err)}${cause ? `; cause: ${String(cause)}` : ""}`,
+        { cause: err },
+      );
+    }
     if (!res.ok) {
       const text = await res.text().catch(() => "");
       throw new Error(

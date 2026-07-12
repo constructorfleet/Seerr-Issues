@@ -40,15 +40,15 @@ For TV, the scope depends on what the user reported in Seerr:
 
 ### Redownload modes
 
-| `REDOWNLOAD_MODE`              | Existing file | Behavior                                                                                                                                                                       |
-| ------------------------------ | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `blocklist-search` _(default)_ | kept          | Blocklists the imported release (marks its grab as failed) then searches, so the search only replaces it with a **different** release. Best for "grabbed a bad release" cases. |
-| `search`                       | kept          | Just searches. Simplest, but your indexer may hand back the same release.                                                                                                      |
-| `delete-search`                | **deleted**   | Deletes the file, then searches. Most reliable for a genuinely corrupt file, but leaves a gap until the replacement arrives.                                                   |
+| `REDOWNLOAD_MODE`              | Existing file | Behavior                                                                                                                     |
+| ------------------------------ | ------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `blocklist-search` _(default)_ | **deleted**   | Legacy-compatible replacement mode: deletes the imported file, then searches. It does not falsify a failed historical grab.  |
+| `search`                       | kept          | Just searches. Simplest, but your indexer may hand back the same release.                                                    |
+| `delete-search`                | **deleted**   | Deletes the file, then searches. Most reliable for a genuinely corrupt file, but leaves a gap until the replacement arrives. |
 
-> **Tip:** `delete-search` is the most robust for corrupt-file complaints because
-> blocklisting only helps if the _release_ was bad and a distinct one exists.
-> The trade-off is the media is unavailable until a replacement imports.
+> **Tip:** `blocklist-search` and `delete-search` both remove the bad file before
+> searching, because Radarr/Sonarr do not reliably replace an existing file. The
+> trade-off is the media is unavailable until a replacement imports.
 
 ## Setup
 
