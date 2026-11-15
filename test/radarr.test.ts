@@ -36,3 +36,18 @@ test("blocklist-search removes an imported file and searches without marking its
     false,
   );
 });
+
+test("tmdbIdForMovieId maps a Radarr movie id, rejecting a mismatched imdbId or missing movie", async () => {
+  mock.method(globalThis, "fetch", async (input) => {
+    if (new URL(String(input)).pathname === "/api/v3/movie/24") {
+      return Response.json({ id: 24, title: "Street Fighter", tmdbId: 1035806, imdbId: "tt123" });
+    }
+    return new Response("not found", { status: 404 });
+  });
+  const client = new RadarrClient({ url: "http://radarr", apiKey: "key" }, "Radarr");
+
+  assert.equal(await client.tmdbIdForMovieId(24), 1035806);
+  assert.equal(await client.tmdbIdForMovieId(24, "tt123"), 1035806);
+  assert.equal(await client.tmdbIdForMovieId(24, "tt999"), null);
+  assert.equal(await client.tmdbIdForMovieId(25), null);
+});

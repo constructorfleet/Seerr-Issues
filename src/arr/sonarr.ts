@@ -7,6 +7,7 @@ interface SonarrSeries {
   id: number;
   title: string;
   tvdbId: number;
+  imdbId?: string;
 }
 
 interface SonarrEpisode {
@@ -40,6 +41,18 @@ export class SonarrClient extends ArrClient {
       query: { tvdbId },
     });
     return series.find((s) => s.tvdbId === tvdbId) ?? series[0] ?? null;
+  }
+
+  /**
+   * Map a Sonarr series id (Seerr's `media.externalServiceId`) to its tvdbId.
+   * When `imdbId` is given it must match, guarding against an id that belongs
+   * to a different Sonarr instance. Returns null if there's no such series.
+   */
+  async tvdbIdForSeriesId(seriesId: number, imdbId?: string | null): Promise<number | null> {
+    const series = await this.getOrNull<SonarrSeries>(`/series/${seriesId}`);
+    if (!series) return null;
+    if (imdbId && series.imdbId && series.imdbId !== imdbId) return null;
+    return series.tvdbId;
   }
 
   /**

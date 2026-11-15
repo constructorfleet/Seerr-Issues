@@ -688,3 +688,64 @@ test("a confirmed entry is never re-searched by recovery", async () => {
   await reloaded.reconcile();
   assert.equal(search.mock.callCount(), 0); // already confirmed, nothing to recover
 });
+
+test("movie issue without tmdbId backfills it from Seerr's issue media", async () => {
+  mock.method(SeerrApi.prototype, "getIssueMedia", async () => ({
+    tmdbId: 603,
+    tvdbId: null,
+    imdbId: "tt0133093",
+    externalServiceId: 24,
+    externalServiceId4k: null,
+  }));
+  const byMovieId = mock.method(RadarrClient.prototype, "tmdbIdForMovieId", async () => 999);
+  const handler = new IssueHandler(baseConfig());
+  const result = await handler.handleIssue(issue({ tmdbId: null }));
+  assert.equal(result.status, "ok");
+  assert.equal(redownloadMovie.mock.calls[0].arguments[0], 603);
+  assert.equal(byMovieId.mock.callCount(), 0);
+});
+
+test("movie issue without any tmdbId maps Seerr's externalServiceId through Radarr", async () => {
+  const getIssueMedia = mock.method(SeerrApi.prototype, "getIssueMedia", async () => ({
+    tmdbId: null,
+    tvdbId: null,
+    imdbId: "tt0133093",
+    externalServiceId: 24,
+    externalServiceId4k: null,
+  }));
+  const byMovieId = mock.method(RadarrClient.prototype, "tmdbIdForMovieId", async () => 603);
+  const handler = new IssueHandler(baseConfig());
+  const result = await handler.handleIssue(issue({ tmdbId: null }));
+  assert.equal(result.status, "ok");
+  assert.equal(getIssueMedia.mock.calls[0].arguments[0], 42);
+  assert.deepEqual(byMovieId.mock.calls[0].arguments, [24, "tt0133093"]);
+  assert.equal(redownloadMovie.mock.calls[0].arguments[0], 603);
+});
+
+test("movie issue is skipped when the tmdbId can't be backfilled", async () => {
+  mock.method(SeerrApi.prototype, "getIssueMedia", async () => {
+    throw new Error("Seerr down");
+  });
+  const handler = new IssueHandler(baseConfig());
+  const result = await handler.handleIssue(issue({ tmdbId: null }));
+  assert.equal(result.status, "skipped");
+  assert.match(result.reason!, /missing tmdbId/);
+  assert.equal(redownloadMovie.mock.callCount(), 0);
+});
+
+test("tv issue without tvdbId maps Seerr's externalServiceId through Sonarr", async () => {
+  mock.method(SeerrApi.prototype, "getIssueMedia", async () => ({
+    tmdbId: 1399,
+    tvdbId: null,
+    imdbId: null,
+    externalServiceId: 7,
+    externalServiceId4k: null,
+  }));
+  mock.method(SonarrClient.prototype, "tvdbIdForSeriesId", async () => 121361);
+  const handler = new IssueHandler(baseConfig());
+  const result = await handler.handleIssue(
+    issue({ mediaType: "tv", tmdbId: 1399, tvdbId: null, affectedSeason: 1, affectedEpisode: 2 }),
+  );
+  assert.equal(result.status, "ok");
+  assert.equal(redownloadTv.mock.calls[0].arguments[0], 121361);
+});

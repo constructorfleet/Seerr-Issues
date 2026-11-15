@@ -54,6 +54,8 @@ export class IssueHandler {
       }
     }
 
+    issue = await this.backfillIds(issue);
+
     if (issue.mediaType === "movie") {
       if (!this.radarr) return { status: "skipped", reason: "Radarr not configured" };
       if (issue.tmdbId === null) return { status: "skipped", reason: "movie issue missing tmdbId" };
@@ -101,6 +103,45 @@ export class IssueHandler {
     this.store.confirmSearch(key);
     await this.commentSearching(issue, result.title ?? issue.subject);
     return { status: "ok", detail: result };
+  }
+
+  /**
+   * Some webhooks arrive without the tmdbId/tvdbId we match on. Ask Seerr for
+   * the issue's media: use its tmdbId/tvdbId if it has one, otherwise map its
+   * `externalServiceId` (the Radarr movie / Sonarr series id) through the arr.
+   * Best-effort: on any failure the issue is returned unchanged.
+   */
+  private async backfillIds(issue: ParsedIssue): Promise<ParsedIssue> {
+    const isMovie = issue.mediaType === "movie";
+    if ((isMovie ? issue.tmdbId : issue.tvdbId) !== null) return issue;
+    const issueId = Number(issue.issueId);
+    if (!this.seerr || !Number.isInteger(issueId)) return issue;
+
+    try {
+      const media = await this.seerr.getIssueMedia(issueId);
+      if (!media) return issue;
+
+      let id = isMovie ? media.tmdbId : media.tvdbId;
+      let source = "seerr media";
+      for (const serviceId of [media.externalServiceId, media.externalServiceId4k]) {
+        if (id !== null || serviceId === null) continue;
+        id = isMovie
+          ? ((await this.radarr?.tmdbIdForMovieId(serviceId, media.imdbId)) ?? null)
+          : ((await this.sonarr?.tvdbIdForSeriesId(serviceId, media.imdbId)) ?? null);
+        source = `${isMovie ? "Radarr movie" : "Sonarr series"} ${serviceId}`;
+      }
+      if (id === null) return issue;
+
+      log.info("Backfilled missing media id", {
+        issueId,
+        [isMovie ? "tmdbId" : "tvdbId"]: id,
+        source,
+      });
+      return isMovie ? { ...issue, tmdbId: id } : { ...issue, tvdbId: id };
+    } catch (err) {
+      log.warn("Failed to backfill missing media id from Seerr", { issueId, error: String(err) });
+      return issue;
+    }
   }
 
   /**
