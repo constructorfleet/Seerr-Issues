@@ -6,6 +6,7 @@ interface RadarrMovie {
   id: number;
   title: string;
   tmdbId: number;
+  imdbId?: string;
   hasFile: boolean;
   movieFile?: { id: number };
 }
@@ -33,6 +34,18 @@ export class RadarrClient extends ArrClient {
       query: { tmdbId },
     });
     return movies.find((m) => m.tmdbId === tmdbId) ?? movies[0] ?? null;
+  }
+
+  /**
+   * Map a Radarr movie id (Seerr's `media.externalServiceId`) to its tmdbId.
+   * When `imdbId` is given it must match, guarding against an id that belongs
+   * to a different Radarr instance. Returns null if there's no such movie.
+   */
+  async tmdbIdForMovieId(movieId: number, imdbId?: string | null): Promise<number | null> {
+    const movie = await this.getOrNull<RadarrMovie>(`/movie/${movieId}`);
+    if (!movie) return null;
+    if (imdbId && movie.imdbId && movie.imdbId !== imdbId) return null;
+    return movie.tmdbId;
   }
 
   /**

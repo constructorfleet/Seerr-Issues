@@ -23,7 +23,10 @@ service back and it **resolves the Seerr issue automatically** (with a comment).
 
 On an `ISSUE_CREATED` (or `ISSUE_REOPENED`) webhook it:
 
-1. Matches the media in Radarr (by `tmdbId`) or Sonarr (by `tvdbId`).
+1. Matches the media in Radarr (by `tmdbId`) or Sonarr (by `tvdbId`). If the
+   webhook is missing that id and the Seerr API is configured, it fetches the
+   issue from Seerr and uses the media's stored id, or maps its
+   `externalServiceId` (the Radarr movie / Sonarr series id) through the arr.
 2. Removes any in-progress download from the queue (blocklisting it).
 3. Depending on `REDOWNLOAD_MODE`, handles the existing file.
 4. Triggers an automatic search for a replacement.
